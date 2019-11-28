@@ -4,14 +4,14 @@ from sklearn.datasets import load_digits
 from sklearn.neighbors import KNeighborsClassifier as kNN
 from joblib import dump, load
 # from sklearn.preprocessing import LabelBinarizer
-from tensorflow.keras import Sequential, layers
+from tensorflow.keras import Sequential, layers 
+from keras.utils import to_categorical
 
 """
 (a) the cross-validation of 5 subsamples, 
 (b) the confusion matrix, and
 (c) the ROC curve for one class vs. all other classes
 """
-
 
 def load_data():
     digits, target = load_digits(return_X_y = True)
@@ -20,6 +20,31 @@ def load_data():
     train_x, train_y = digits[:stone], target[:stone]
     test_x, test_y = digits[stone:], target[stone:]
     return train_x, train_y, test_x, test_y
+
+
+def prepare(modelName,  x_train, y_train, x_test, y_test):
+    # prepare for deep model 
+    if modelName == 'deepModel1' :
+        y_train = to_categorical(y_train)
+        y_test = to_categorical(y_test)
+
+    elif modelName == 'deepModel2':
+        x_train = x_train.reshape(x_train.shape[0],8,8,1).astype('float32')
+        x_test = x_test.reshape(x_test.shape[0],8,8,1).astype('float32')
+        y_train = to_categorical(y_train)
+        y_test = to_categorical(y_test)
+
+    else:
+        print('error')
+
+    return x_train, y_train, x_test, y_test
+
+
+def load_save_model(modelName, load=True):
+    if load:
+        return load(modelName + '.joblib')
+    else:
+        return dump(modelName + '.joblib')
 
 
 def evalute(data, label):
@@ -80,21 +105,49 @@ def deepModel2():
     with convolutional layer 
     """
     model = Sequential() # 构建一个空的序贯模型
-    model.add(layers.Dense(512,activation='relu',input_shape=(64,)))
-    model.add(layers.Conv2D(32, (3, 3), activation='relu'))
+    model.add(layers.Conv2D(16,(3,3),padding='same',input_shape=(8,8,1),activation='relu'))
+    model.add(layers.Conv2D(8,(3,3),activation='relu'))
+    model.add(layers.Flatten())
     model.add(layers.Dense(10,activation='softmax'))
-    return model    
+    return model 
+
+
+def train(modelName, x_train, y_train, x_test, y_test):
+    """
+    train model
+    """
+    if modelName=='knn1' or if modelName=='knn2':
+        model.fit(x_train,y_train)
+
+    elif modelName=='deepModel1' or modelName=='deepModel2':
+        model.compile(loss='categorical_crossentropy',optimizer='adam',metrics=['accuracy'])
+        train_history=model.fit(x_train,y_train,epochs=10,batch_size=300,verbose=2)
+
+
+def task1():
+    """
+    (a) the cross-validation of 5 subsamples
+    """
+
+
+def task2():
+    """
+    (b) the confusion matrix, and
+    """
+
+
+def task3():
+    """
+    (c) the ROC curve for one class vs. all other classes
+    """
+
 
 
 if __name__ == '__main__':
-    
+    # load data
     x_train, y_train, x_test, y_test = load_data()
 
-    # prepare for deep model 
-    from keras.utils import to_categorical
-    y_train = to_categorical(y_train)
-    y_test = to_categorical(y_test)
 
-    dump(model, 'kNN.joblib')
-    library_model = load('sklearn_kNN.joblib')
+
+    
 
