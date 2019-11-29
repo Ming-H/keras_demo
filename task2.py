@@ -1,11 +1,16 @@
+# -*- coding:utf-8 -*- 
+
 import numpy as np
-# from sklearn.cross_validation import train_test_split
 from sklearn.datasets import load_digits
 from sklearn.neighbors import KNeighborsClassifier as kNN
 from joblib import dump, load
-# from sklearn.preprocessing import LabelBinarizer
 from tensorflow.keras import Sequential, layers 
 from keras.utils import to_categorical
+from tensorflow.keras.models import load_model
+from collections import defaultdict
+from sklearn import metrics
+import matplotlib.pyplot as plt
+
 
 """
 (a) the cross-validation of 5 subsamples, 
@@ -40,11 +45,13 @@ def prepare(modelName,  x_train, y_train, x_test, y_test):
     return x_train, y_train, x_test, y_test
 
 
-def load_save_model(modelName, load=True):
-    if load:
+def load_save_model(modelName):
+    if modelName=='knn1' or modelName=='knn2':
         return load(modelName + '.joblib')
-    else:
-        return dump(modelName + '.joblib')
+
+    elif modelName=='deepModel1' or modelName=='deepModel2':
+        return load_model(modelName+'.h5')
+
 
 
 def evalute(data, label):
@@ -86,6 +93,11 @@ class Model:
         return labels
 
 def knn2():
+    """
+    model = Model()
+    model.fit(train_x, train_y)
+    dump(model, 'kNN.joblib')
+    """
     return Model()
 
 
@@ -112,42 +124,133 @@ def deepModel2():
     return model 
 
 
-def train(modelName, x_train, y_train, x_test, y_test):
+def train(modelName, x_train, y_train, x_test, y_test, saveFlag=True):
     """
     train model
     """
-    if modelName=='knn1' or if modelName=='knn2':
+    if modelName=='knn1' or modelName=='knn2':
+        if modelName=='knn1':
+            model = knn1()
+        else:
+            model = knn2()
         model.fit(x_train,y_train)
+        if saveFlag == 'True':
+            dump(model, modelName+ '.joblib')
 
     elif modelName=='deepModel1' or modelName=='deepModel2':
+        if modelName=='deepModel1':
+            model = deepModel1()
+        else:
+            model = deepModel2()
+        
+        x_train, y_train, x_test, y_test = prepare(modelName, x_train, y_train, x_test, y_test)
+
         model.compile(loss='categorical_crossentropy',optimizer='adam',metrics=['accuracy'])
-        train_history=model.fit(x_train,y_train,epochs=10,batch_size=300,verbose=2)
+        model.fit(x_train,y_train,epochs=10,batch_size=300,verbose=2)
+        
+        if saveFlag == 'True':
+            model_save_path = modelName + ".h5"
+            model.save(model_save_path)
+    
+    return model, x_test, y_test
+
 
 
 def task1():
     """
     (a) the cross-validation of 5 subsamples
     """
+    d1 = defaultdict(list)
+    digits, target = load_digits(return_X_y = True)
+    N, D = digits.shape
+    stone = N // 5
+    start = 0
+    end = N // 5
+    for i in range(5):
+        x_train = np.vstack((digits[0:start],digits[end:N]))
+        x_test = digits[start: end]
+        y_train = np.vstack((target[0:start],target[end:N]))
+        y_test = target[start: end]
+        
+        for modelName in ['knn1', 'knn2', 'deepModel1', 'deepModel2']:
+            model, x_test, y_test = train(modelName, x_train, y_train, \
+                                          x_test, y_test, saveFlag=False)
 
-
+            y_pre = model.predict(x_test)
+            # cal acc
+            error = evalute(y_pre, y_test)
+            if modelName not in d1:
+                d1[modelName] = []
+            else:
+                d1[modelName].append(error)
+            
+        start += stone
+        end += stone
+    # 平均错误率
+    for key in d1:
+        d1[key] = sum(d1[key]) / len(d1[key]) 
+    print(d1)
+        
+    
 def task2():
     """
     (b) the confusion matrix, and
     """
+    train_x, train_y, test_x, test_y = load_data()
+    i = 0
+    for modelName in ['knn1', 'knn2', 'deepModel1', 'deepModel2']:
+        if i>=2:
+            Flag = True
+        else:
+            Flag = False
+        model, x_test, y_test = train(modelName, train_x, train_y, 
+                                      test_x, test_y, saveFlag=Flag)  
+        
+        if modelName == 'knn1' or modelName == 'knn2':
+            y_pred = model.predict(x_test)
+            print("Confusion_matrix  of %s is: \n" % modelName, \
+                              metrics.confusion_matrix(test_y, y_pred))
 
-
+        elif modelName == 'deepModel1' or modelName == 'deepModel2':
+            y_pred = model.predict_classes(x_test)            
+            print("Confusion_matrix  of %s is: \n" % modelName, \
+                          metrics.confusion_matrix(test_y, y_pred))
+        
+        
 def task3():
     """
     (c) the ROC curve for one class vs. all other classes
     """
+    x_train, y_train,  x_test, y_test = load_data()
+    y_train = [0 if item==0 else 1 for item in y_train]
+    y_test = [0 if item==0 else 1 for item in y_test]
 
+    fpr = [] 
+    tpr = [] 
+    for modelName in ['knn1', 'knn2', 'deepModel1', 'deepModel2']:
+        model, x_test, y_test = train(modelName, x_train, y_train, \
+                                             x_test, y_test, saveFlag=False)  
+        y_pred = model.predict(x_test)
+        fpr.append(metrics.roc_curve(y_test, y_pred)[0]) 
+        tpr.append(metrics.roc_curve(y_test, y_pred)[1]) 
+    
+    plt.plot(fpr[0], tpr[0], marker = 'o') 
+    plt.plot(fpr[1], tpr[1], marker = '*') 
+    plt.plot(fpr[2], tpr[2], marker = '^') 
+    plt.plot(fpr[3], tpr[3], marker = '.') 
+    plt.show()
+    
 
 
 if __name__ == '__main__':
-    # load data
-    x_train, y_train, x_test, y_test = load_data()
+    print("begin...")
+    task1()
+    task2()
+    task3()
+    print("over!")
 
 
 
-    
+
+
 
